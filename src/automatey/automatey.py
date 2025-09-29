@@ -21,12 +21,15 @@ class Automatey:
     _start_time: float = time.time()
 
     def __new__(cls, *args, **kwargs):
+        """
+        Singleton pattern implementation to ensure only one instance of Automatey exists.
+        """
         if cls._instance is None:
             cls._instance = super(Automatey, cls).__new__(cls)
         return cls._instance
 
     def __init__(self,
-                 config_filename: str = 'automatey.toml',
+                 config_file_path: str = 'automatey.toml',
                  configure_logging: bool = True,
                  register_atexit_timer: bool = True) -> None:
         """
@@ -36,9 +39,11 @@ class Automatey:
         :param register_atexit_timer: A boolean value indicating whether to register the atexit timer.
         :return: None
         """
+        # Prevent re-initialization in singleton pattern
         if getattr(self, '_initialized', False):
             return
         
+        # Mark as initialized (for singleton pattern)
         self._initialized = True
 
         # Datetime Constant
@@ -56,8 +61,11 @@ class Automatey:
         self._current_second: str = str(self._current_date_time.second).rjust(2, '0')
         self._current_time: str = self._current_hour + self._current_minute + self._current_second
 
+        # Config file location (found by set_config method)
+        self.config_location: str = ''
+
         # Initialize config and core constants
-        self.config: dict = self.set_config(config_filename)
+        self.config: dict = self.set_config(config_file_path)
 
         if configure_logging:
             self.configure_logging()
@@ -66,23 +74,37 @@ class Automatey:
             self.register_atexit_timer()
 
     def set_config(self, 
-                   config_filename: str) -> dict:
+                   config_file_path: str) -> dict:
         """
-        Walks up the directory tree from the current working directory until it finds the config file.
-        Raises FileNotFoundError if not found up to the root directory.
+        Searches for the configuration file by walking up the directory tree from the current working directory. 
+        If an absolute path is provided, it attempts to load the configuration from that path directly.
         
-        :param config_filename: The name of the configuration file to search for.
+        :param config_file_path: The name or absolute path of the configuration file to search for.
         :return: The loaded configuration as a dictionary.
         """
+        # Check if the provided path is absolute first if a configuration file was provided by the user.
+        if os.path.isabs(config_file_path):
+            try:
+                with open(config_file_path, "rb") as f:
+                    config = tomllib.load(f)
+                    self.config_location = config_file_path
+                    return config
+            except tomllib.TOMLDecodeError as e:
+                raise ValueError(f"Malformed TOML in config file: {config_file_path}") from e
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Configuration file '{config_file_path}' not found. Please provide a valid path.")
+
+        # If not absolute, walk up the directory tree to find the config file by name
         current_dir = Path(os.getcwd()).resolve()
         root_dir = current_dir.anchor  # e.g., 'C:\' or '/' depending on OS
         config_path = None
 
         while True:
-            candidate = current_dir / config_filename
+            candidate = current_dir / config_file_path
 
             if candidate.exists():
                 config_path = candidate
+                self.config_location = str(config_path)
                 break
             
             if str(current_dir) == root_dir:
@@ -91,7 +113,7 @@ class Automatey:
             current_dir = current_dir.parent
 
         if config_path is None:
-            raise FileNotFoundError(f"Configuration file '{config_filename}' not found from '{os.getcwd()}' up to root directory '{root_dir}'.")
+            raise FileNotFoundError(f"Configuration file '{config_file_path}' not found. Please create one in the current directory or any parent directory or provide a valid path.")
 
         try:
             with open(config_path, "rb") as f:
@@ -213,6 +235,10 @@ class Automatey:
 
     @property
     def logger(self) -> logging.Logger:
+        """
+        Returns the logger instance for the Automatey package.
+        :return: The logger instance.
+        """
         return logging.getLogger("automatey")
 
     def register_atexit_timer(self) -> None:
@@ -223,4 +249,4 @@ class Automatey:
         def exit_timer():
             end_time: float = time.time() - self._start_time
             td_end_time_str: str = str(timedelta(seconds=end_time))
-            self.logger.info(f'Task execution time: {td_end_time_str}')
+            self.logger.info(f'All tasks complete: {td_end_time_str}')
