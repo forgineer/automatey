@@ -182,7 +182,7 @@ class Automatey:
         }
         
         # Define file handler defaults
-        enable_file_handler: bool = self.get_config('automatey', 'logging', 'enable_file_handler')
+        enable_file_handler: bool = self.get_config('automatey', 'logging', 'enable_file_handler') or False
         
         if enable_file_handler is not False:
             logging_filename: str = self.get_config('automatey', 'logging', 'filename') or './Log/automatey_<DATE>.log'
@@ -213,7 +213,7 @@ class Automatey:
             }
 
         # Define 'automatey' logger to use both console and file handlers if file handler is enabled
-        if enable_file_handler:
+        if enable_file_handler is not False:
             logging_config['loggers'] = {
                 'automatey': {
                     'handlers': ['console', 'file'],
