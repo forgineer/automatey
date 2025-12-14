@@ -7,46 +7,6 @@ from . import __version__
 from .data_tools import combine_csv_files
 
 
-class Spinner:
-    """
-    A simple console spinner usable as a context manager.
-
-    Usage:
-        with Spinner('Working...'):
-            do_long_task()
-
-    The spinner runs in a background thread and stops when the context exits.
-    """
-    def __init__(self, message="Working...", delay=0.1):
-        self.message = message
-        self.delay = delay
-        self._stop = threading.Event()
-        self._thread = None
-
-    def _spin(self):
-        for ch in itertools.cycle("|/-\\"):
-            if self._stop.is_set():
-                break
-            print(f"\r{self.message} {ch}", end="", flush=True)
-            time.sleep(self.delay)
-        # clear the line when done
-        print("\r" + " " * (len(self.message) + 2) + "\r", end="", flush=True)
-
-    def __enter__(self):
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._spin)
-        self._thread.daemon = True
-        self._thread.start()
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self._stop.set()
-        if self._thread is not None:
-            self._thread.join()
-        # Do not swallow exceptions
-        return False
-
-
 @click.command()
 @click.option('--version', is_flag=True, help='Prints the version of the package.')
 @click.option('--run', is_flag=True, help='Executes the DAG if one is provided.')

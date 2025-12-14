@@ -17,7 +17,6 @@ def combine_csv_files(directory_path: str = None, output_file: str = 'combined.c
 
     # Find all CSV files in the specified directory
     csv_files: list = glob.glob(os.path.join(directory_path, '*.csv'))
-    #csv_files.extend(glob.glob(os.path.join(directory_path, '*.CSV')))
 
     # Define SQL statements
     sql_statements: list = []
@@ -59,4 +58,44 @@ def combine_csv_files(directory_path: str = None, output_file: str = 'combined.c
     """
 
     con.execute(statement)
+    con.close()
+
+
+def split_csv_file(input_file: str, output_directory: str = None, chunk_size: int = 1000) -> None:
+    """
+    Splits a large CSV file into smaller chunks.
+
+    :param input_file: The path to the input CSV file.
+    :param output_directory: The directory where the split files will be saved.
+    :param chunk_size: The number of rows per split file.
+    """
+    if output_directory is None:
+        output_directory = os.path.dirname(input_file)
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_directory, exist_ok=True)
+
+    # Create a DuckDB connection
+    con = duckdb.connect(database=':memory:')
+
+    # Read the input CSV file
+    con.execute(f"CREATE TABLE temp AS SELECT * FROM read_csv_auto('{input_file}', header=True);")
+
+    # Get total number of rows
+    total_rows = con.execute("SELECT COUNT(*) FROM temp;").fetchone()[0]
+
+    # Split the CSV file into chunks
+    for start in range(0, total_rows, chunk_size):
+        end = min(start + chunk_size, total_rows)
+        output_file = os.path.join(output_directory, f'split_{start // chunk_size + 1}.csv')
+
+        con.execute(f"""
+        COPY (
+            SELECT * FROM temp
+            LIMIT {chunk_size} OFFSET {start}
+        ) TO '{output_file}' WITH (HEADER TRUE);
+        """)
+
+        click.echo(f'Created split file: {output_file}')
+
     con.close()
